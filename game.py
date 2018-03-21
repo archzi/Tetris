@@ -55,6 +55,57 @@ game_over=False      #游戏结束标志
 pause=False     #游戏暂停标志
 
 
+def sys_init():
+    '''
+    这一部分是系统的初始化，包括各项变量的初始化，pygame的初始化。
+    生成每个方块的四个不懂方向的矩阵。
+    :return:
+    '''
+    global default_font,screen,back_surface,clock,blocks,stage,game_over,fall_speed,begin_fall_speed,now_block,next_block
+    global score,level,clear_line_score,pause
+
+    #pygame 初始化
+    pg.init()
+    screen = pg.display.set_mode((500,550))
+    back_surface = pg.Surface((screen.get_rect().width,screen.get_rect().height))
+    pg.display.set_caption("Tetris")  #窗口显示的字
+    clock = pg.time.Clock()
+    pg.mouse.set_visible(False)
+
+
+    # 游戏全局变量初始化
+    default_font = pg.font.Font("res/font/yh.ttf",16)  #雅黑字体
+    now_block = None
+    next_block = None
+    game_over = False
+    pause = False
+    score = 0
+    level = 1
+    clear_line_score = 0
+    begin_fall_speed = 20
+    fall_speed = begin_fall_speed - level*2
+
+
+    #初始化游戏舞台
+    stage = []
+    for y  in range(max_block_height):
+        stage.append([])
+        for x in range(max_block_width):
+            stage[y].append(EMPTY_CELL)
+
+    #生成每个方块形状4个方向的矩阵数据
+    for x in range(len(blocks)):
+        # 因为重新开始要调用sys_init()对系统所有参数重新初始化，为了避免冲突，这里要判定一下blocks[]
+        if len(blocks[x])<2:
+            t = blocks[x][0]
+            for i in range(3):
+                t = transform(t,1)
+                blocks[x].append(format_block(t))
+
+
+
+
+
 
 def get_conf(file_name):
     '''
@@ -71,11 +122,11 @@ def get_conf(file_name):
             blocks_num = len(blocks)-1  #blocks_num 从1 开始
             blocks[blocks_num] = [] # 这个开始存方块的形状也就是说同一种方块有4种形状。
             blocks[blocks_num].append([])  #这个开始存方块的具体内容，为4*4的形状。
-            row = temp.split(';') #用split()方法对temp 进行切片，形成一个list  len(row)=4
+            row = temp.split(";") #用split()方法对temp 进行切片，形成一个list  len(row)=4
             print(len(row))
             for r in range(len(row)):# len(row)=4
                 col = []
-                ct = row[r].split(',')    #用','对row中每一个元素进行切片
+                ct = row[r].split(",")    #用','对row中每一个元素进行切片
                 #对矩阵进行规整，没有1的地方要补齐 在这个for 循环中除了配置中有0或1的地方，其他地方只有一个0
                 for c in range(len(ct)):    #len(ct)不一定是4
                     if ct[c]!='1':
@@ -90,7 +141,7 @@ def get_conf(file_name):
             #此时 blocks[blocks_num][0]成为一个4*4的list
             # 根据配置文件以下循环没有意义，保险起见加上。
             for r in range(len(row) - 1, 3):
-                blocks[blocksNumb][0].append([0, 0, 0, 0])
+                blocks[blocks_num][0].append([0, 0, 0, 0])
             blocks[blocks_num][0] = format_block(blocks[blocks_num][0])
 
 
@@ -112,7 +163,7 @@ def remove_top_blank(block):
     while sum(result[0])<1 and blank_num<4:
         del result [0]
         result.append([0,0,0,0])
-        blank_num =blank_num+1
+        blank_num +=1
     return result
 
 def transform(block,direction = 0):
@@ -129,7 +180,7 @@ def transform(block,direction = 0):
             if direction ==0:
                 result[y].append(block[x][3-y])
             else:
-                result[y].append(block[3-y][y])
+                result[y].append(block[3-x][y])
     return result
 
 
@@ -146,15 +197,94 @@ def format_block(block):
     result = transform(result,0)
     return result
 
+class BlockSprite(object):
+    '''
+    方块精灵类
+    下落的方块全靠这个类来实现。
+    attributes:
+    shape: 方块形状编号
+    direction：方块旋转方向编号
+    xy : 方块形状左上角坐标
+    block:方块形状矩阵
+    '''
+    def __init__(self,shape,direction,xy):
+        self.__shape = shape
+        self.__direction = direction
+        self.__xy = xy
+
+    def change_direction(self,direction):
+        '''
+        改变方块的方向
+        direction: 1为顺时针旋转，0 为逆时针旋转。
+        :param direction:
+        :return:
+        '''
+        dir_num = len(blocks[self.__shape]) - 1
+        if direction == 1:
+            self.__direction = self.__direction+1
+            if self.__direction>dir_num:
+                self.__direction = 0
+        else:
+            self.__direction = self.__direction-1
+            if self.__direction < 0:
+                self.__direction = dir_num
+
+    def clone(self):
+        '''
+        克隆本体
+        :return:返回自身的克隆
+        '''
+        return BlockSprite(self.__shape,self.__direction,Point(self.__xy.x,self.__xy.y))
+    def get_blocks(self):
+        return blocks[self.__shape][self.__direction]
+
+    block = property(get_blocks)
+
+
+class Point(object):
+    '''
+    平面坐标点类
+    attributes:
+    x,y :坐标值
+    '''
+    def __init__(self,x,y):
+        self.__x = x
+        self.__y = y
+    def get_x(self):
+        return self.__x
+
+    def set_x(self,x):
+        self.__x = x
+    x = property(get_x,set_x)   #装饰器
+
+    def get_y(self):
+        return self.__y
+
+    def set_y(self,y):
+        self.__y = y
+
+    y = property(get_y,set_y)
+
+    def __str__(self):
+        return "{x:"+"{:.0f}".format(self.__x)+",y:"+"{:.0f}".format(self.__y)+"}"
+
+
+def process():
+    '''
+    游戏逻辑控制
+    '''
+    global game_over,now_block,next_block,speed_buff,back_surface,key_buff,pause
+    if next_block is None:
+        next_block = blockSprite()
 
 def main():
     '''
     主程序
     '''
     get_conf("elsfk.cfg")
-#    sysInit()
-#    while True:
-#        process()
+    sys_init()
+    while True:
+       process()
 
 
 if __name__ == "__main__":
