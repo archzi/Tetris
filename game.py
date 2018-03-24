@@ -13,7 +13,7 @@ Created on Sat Mar 17 17:13:10 2018
 '''
 
 # 用到的模块
-
+import sys
 import random,copy
 import pygame as pg
 from pygame.locals import *
@@ -88,7 +88,7 @@ def sys_init():
 
     #初始化游戏舞台
     stage = []
-    for y  in range(max_block_height):
+    for y in range(max_block_height):
         stage.append([])
         for x in range(max_block_width):
             stage[y].append(EMPTY_CELL)
@@ -116,7 +116,7 @@ def get_conf(file_name):
     list的第三个[]为每个方块的编码，为4*4的一个list。
     '''
     global blocks  #记录方块的形状。
-    with open(file_name,'rt') as fp:
+    with open(file_name, 'rt') as fp:
         for temp in fp.readlines():
             blocks.append([])  #创建blocks的第一维，用blocks_num来记录方块的形状。blocks_num根据temp的改变而改变，为0，1，2，..
             blocks_num = len(blocks)-1  #blocks_num 从1 开始
@@ -154,7 +154,6 @@ transform 函数实现的 把方块旋转
 
 def remove_top_blank(block):
     '''
-
     :param block: 清除方块矩阵顶部空行数据  block[blocks_num][0]
     :return:整理后的方块数据
     '''
@@ -208,9 +207,9 @@ class BlockSprite(object):
     block:方块形状矩阵
     '''
     def __init__(self,shape,direction,xy):
-        self.__shape = shape
-        self.__direction = direction
-        self.__xy = xy
+        self.shape = shape
+        self.direction = direction
+        self.xy = xy    #这个里面的不能封装数据
 
     def change_direction(self,direction):
         '''
@@ -219,26 +218,26 @@ class BlockSprite(object):
         :param direction:
         :return:
         '''
-        dir_num = len(blocks[self.__shape]) - 1
+        dir_num = len(blocks[self.shape]) - 1
         if direction == 1:
-            self.__direction = self.__direction+1
-            if self.__direction>dir_num:
-                self.__direction = 0
+            self.direction = self.direction+1
+            if self.direction>dir_num:
+                self.direction = 0
         else:
-            self.__direction = self.__direction-1
-            if self.__direction < 0:
-                self.__direction = dir_num
+            self.direction = self.direction-1
+            if self.direction < 0:
+                self.direction = dir_num
 
     def clone(self):
         '''
         克隆本体
         :return:返回自身的克隆
         '''
-        return BlockSprite(self.__shape,self.__direction,Point(self.__xy.x,self.__xy.y))
+        return BlockSprite(self.shape,self.direction,Point(self.xy.x,self.xy.y))
     def get_blocks(self):
-        return blocks[self.__shape][self.__direction]
+        return blocks[self.shape][self.direction]        #返回一个blocks[][]
 
-    block = property(get_blocks)
+    block = property(get_blocks)   # 这个装饰器在check_deany 中用到
 
 
 class Point(object):
@@ -250,23 +249,195 @@ class Point(object):
     def __init__(self,x,y):
         self.__x = x
         self.__y = y
-    def get_x(self):
+    @property
+    def x(self):
         return self.__x
-
-    def set_x(self,x):
+    @x.setter
+    def x(self, x):
         self.__x = x
-    x = property(get_x,set_x)   #装饰器
 
-    def get_y(self):
+    #def get_x(self):
+        #return self.__x
+
+
+#    x = property(get_x,set_x)   #装饰器
+    @property
+    def y(self):
         return self.__y
-
-    def set_y(self,y):
+    @y.setter
+    def y(self,y):
         self.__y = y
 
-    y = property(get_y,set_y)
+
+    #def get_y(self):
+        #return self.__y
+
+    #def set_y(self,y):
+        #self.__y = y
+
+    #y = property(get_y,set_y)
 
     def __str__(self):
         return "{x:"+"{:.0f}".format(self.__x)+",y:"+"{:.0f}".format(self.__y)+"}"
+
+def check_deany(sprite):
+    '''
+    检查下落方块是否与舞台堆叠区中间的实方块发生碰撞
+
+    :param sprite:下落的方块。
+    :return:如果碰撞 返回 True
+    '''
+    top_x = sprite.xy.x
+    top_y = sprite.xy.y
+    for y in range(len(sprite.block)):   ## sprite.blocks 为 blocks[shape][direction]
+        for x in range(len(sprite.block[y])): # 这段代码是对某一个方块进行遍历，如果==1 的话
+            if sprite.block[y][x] == 1:
+                y_in_stage = top_y + y
+                x_in_stage = top_x + x
+                if y_in_stage > max_block_height - 1  or  y_in_stage<0:
+                    return True
+                if x_in_stage >max_block_width-1 or x_in_stage <0:
+                    return True
+                if stage[y_in_stage][x_in_stage] == STATIC_BLOCK:
+                    return True
+    return False
+
+def update_stage(sprite,update_type = 1):
+    '''
+    将下落方块数据坐标更新到堆叠区中。下落的方块涉及的坐标在堆叠去中用数字1 标识，固实的方块在堆叠去中用数字2 表示。
+    :param sprite: 下落方块形状
+    :param update_type: 更新方式，0 代表清除，1 代表动态加入，2代表固实加入。
+    :return:
+    '''
+    global stage
+    top_x = sprite.xy.x
+    top_y = sprite.xy.y
+    for y in range(len(sprite.block)):
+        for x in range(len(sprite.block[y])):
+            if sprite.block[y][x]==1:
+                if update_type == 0 :
+                    if stage[top_y+y][top_x+x] ==FALLING_BLOCK:
+                        stage[top_y+y][top_x+x] = EMPTY_CELL
+                elif update_type == 1:
+                    if stage[top_y+y][top_x+x] ==EMPTY_CELL:
+                        stage[top_y+y][top_x+x] = FALLING_BLOCK
+                else:
+                    stage[top_y+y][top_x+x] = STATIC_BLOCK
+
+def check_line():
+    '''
+    检测堆叠去是否有可消除的整行固实方块
+    根据检测结果重新生成堆叠去矩阵数据，调用update_score 函数更新还价积分等数据
+    :return:
+    本轮下落周期消除的固实方块行数
+    '''
+    global stage
+    clear_count = 0  # 本轮下落周期消除的固实方块行数
+    tmp_stage = [] #根据消除情况新生成的堆叠区矩阵，在有更新的情况下会替换全局的堆叠去矩阵
+
+    for y in stage:
+        # 因为固实方块在堆叠区矩阵里以2 表示，所以判断防方块是否被消除只需要计算矩阵行数值合计是否等于堆叠去X轴最大方块数*2就可以。
+        if sum(y)>= max_block_width*2:
+            tmp_stage.insert(0,max_block_width*[0])
+            clear_count = clear_count+1
+        else:
+            tmp_stage.append(y)
+
+    if clear_count>0:
+        stage = tmp_stage
+        update_score(clear_count)
+    return clear_count
+
+def update_score(clear_count):
+    '''
+    更新玩家的游戏记录，包括积分，管卡，消除方块行数，并且根据关卡数更新方块下落速度。
+
+    :param clear_count:本轮下落周期内消除的方块行数。
+    :return:当前游戏的最新积分
+    '''
+
+    global score,fall_speed,level,clear_line_score
+
+    prize_point=0  # 额外奖励分数，同时消除的行数越多，奖励分值越高
+    if clear_count>1:
+        if clear_count<4:
+            prize_point = clear_count**clear_count
+
+        else:
+            prize_point = clear_count*5
+    score = score+(clear_count+prize_point)*level
+
+    if score>99999999:
+        score = 0
+
+    clear_line_score = clear_line_score+clear_count
+
+    if clear_line_score>100:
+        clear_line_score = 0
+        level = level+1
+
+        if level>(begin_fall_speed/2):
+            level = 1
+            fall_speed = begin_fall_speed
+        fall_speed = begin_fall_speed-level*2
+    return  score
+
+def printTxt(content,x,y,font,screen,color=(255,255,255)):
+
+
+    imgTxt = font.render(content,True,color)
+    screen.blit(imgTxt,(x,y))
+
+
+def draw_stage(draw_screen):
+    '''
+    在给定的画布上绘制舞台
+    :param draw_screnn: 待绘制的画布
+    :return:
+    '''
+    static_color = 30,102,76  # 固实方块颜色
+    active_color = 255,239,0 #方块形状颜色
+    font_color =200,10,120 # 文字颜色
+
+    base_rect = 0,0,block_width*max_block_width+1,block_height*max_block_height+1   #堆叠去方框
+    #绘制堆叠去外框
+    draw_screen.fill((180,200,170))
+    pg.draw.rect(draw_screen,static_color,base_rect,1)
+
+    #绘制堆叠去内所有的方块，包括下落方块形状
+    for y in range(len(stage)):
+        for x in range(len(stage[y])):
+            base_rect = x*block_width,y*block_height,block_width,block_height
+            if stage[y][x]==2:
+                pg.draw.rect(draw_screen,static_color,base_rect)
+            elif stage[y][x] == 1:
+                pg.draw.rect(draw_screen,active_color,base_rect)
+
+        # 绘制下一个登场的下落方块形状
+        printTxt("下一个：",320,350,default_font,back_surface,font_color)
+        if next_block != None:
+            for y in range(len(next_block.block)):
+                for x in range(len(next_block.block[y])):
+                    base_rect = 320+x*block_width,380+y*block_height,block_width,block_height
+                    if next_block.block[y][x] == 1:
+                        pg.draw.rect(draw_screen,active_color,base_rect)
+
+
+        #绘制当前关卡、积分、当前关卡消除整行数
+        printTxt("等级：%d" % level,320,40,default_font,back_surface,font_color)
+        printTxt("分数：%d" % score,320,70,default_font,back_surface,font_color)
+        printTxt("已消除:%d行" % clear_line_score,320,100,default_font,back_surface,font_color)
+
+
+        #特殊游戏状态的输入
+
+        if game_over:
+            printTxt("完蛋啦",230,200,default_font,back_surface,font_color)
+            printTxt("<按'RETURN'重新开始>",200,260,default_font,back_surface,font_color)
+
+        if pause:
+            printTxt("干嘛去啦，怎么不来玩我",230,200,default_font,back_surface,font_color)
+            printTxt("快点继续啦，请按'RETURN'",200,260,default_font,back_surface,font_color)
 
 
 def process():
@@ -275,7 +446,98 @@ def process():
     '''
     global game_over,now_block,next_block,speed_buff,back_surface,key_buff,pause
     if next_block is None:
-        next_block = blockSprite()
+        next_block = BlockSprite(random.randint(0,len(blocks)-1),random.randint(0,3),Point(max_block_width+4,max_block_height))
+    if now_block is None:
+        now_block = next_block.clone()  # 克隆block
+        now_block.xy = Point(max_block_width//2,0)   # 把next_block中的坐标改为 在舞台中间
+        next_block = BlockSprite(random.randint(0,len(blocks)-1),random.randint(0,3),Point(max_block_width+4,max_block_height))
+        # 方块下落时要检测是否 gameover
+        game_over = check_deany(now_block)
+        if game_over:
+            update_stage(now_block,2)
+    '''
+    对下落的方块方块形状操控以及移动，采用影子形状进行预判断。如果没有碰撞则将变化应用到正在下落的方块上，否则不变化。
+    '''
+
+    tmp_block = now_block.clone()
+
+    '''
+    处理用户输入
+    对于用户输入分为两部分处理。
+    1、将退出、暂停、重新开始以及形状的变换的操作当做敲击事件处理。这样的好处是对只敲一次键盘作出处理，
+    避免用户按住单一按键后程序反复处理影响操控，特别是变换形状操作，敲击一次键盘变换一次形状，玩家很容易操作。
+    '''
+    for event in pg.event.get():
+        if event.type == pg.QUIT:
+            sys.exit()
+            pg.quit()
+        elif event.type == pg.KEYDOWN:
+            if event.key == pg.K_ESCAPE:
+                sys.exit()
+                pg.quit()
+            elif event.key == pg.K_RETURN:
+                if game_over:
+                    sys_init()
+                    return
+                elif pause:
+                    pause = False
+                else:
+                    pause = True
+                    return
+            elif not game_over and not pause:
+                if event.key == pg.K_SPACE:
+                    tmp_block.change_direction(1)
+                elif event.key == pg.K_UP:
+                    tmp_block.change_direction(0)
+    if not game_over and not pause:
+        '''
+        2、将左右移动和快速下落的操作按以下事件处理。
+        这样做的好处是不需要玩家反复敲击键盘进行操作，保证了程序的连贯性。
+        由于连续移动的速度太快，不利于定位。所以在程序中采用了简单的输入减缓处理，即通过keyBuff 保存上一次的按键，如果此次按键和
+        上次的相同，则跳过此轮按键处理。
+        '''
+        keys = pg.key.get_pressed()
+        if keys[K_DOWN]:
+            tmp_block.xy = Point(tmp_block.xy.x,tmp_block.xy.y+1)
+            key_buff = None
+        elif keys[K_LEFT]:
+            if key_buff!=pg.K_LEFT:
+                tmp_block.xy = Point(tmp_block.xy.x-1,tmp_block.xy.y)
+                key_buff = pg.K_LEFT
+            else:
+                key_buff = None
+        elif keys[K_RIGHT]:
+            if key_buff!=pg.K_RIGHT:
+                tmp_block.xy = Point(tmp_block.xy.x+1,tmp_block.xy.y)
+                key_buff = pg.K_RIGHT
+            else:
+                key_buff = None
+        if not check_deany(tmp_block):
+            update_stage(now_block,0)
+            now_block = tmp_block.clone()
+
+
+        #处理自动下落
+        speed_buff = speed_buff+1
+        if speed_buff>=fall_speed:
+            speed_buff = 0
+            tmp_block = now_block.clone()
+            tmp_block.xy = Point(now_block.xy.x,now_block.xy.y+1)
+            if not check_deany(tmp_block):
+                update_stage(now_block,0)
+                now_block = tmp_block.clone()
+                update_stage(now_block,1)
+            else:
+                #在自动下落的过程中一旦发生活动方块的碰撞，则将活动方块做固实处理，并检测是否有可消除的整行方块
+                update_stage(now_block,2)
+                check_line()
+                now_block = None
+        else:
+            update_stage(now_block,1)
+    draw_stage(back_surface)
+    screen.blit(back_surface,(0,0))
+    pg.display.update()
+    clock.tick(30)
 
 def main():
     '''
