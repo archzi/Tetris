@@ -8,8 +8,6 @@ Created on Sat Mar 17 17:13:10 2018
 '''
 俄罗斯方块游戏：
 首先游戏有方块有7种；
-
-
 '''
 
 # 用到的模块
@@ -19,8 +17,7 @@ import pygame as pg
 from pygame.locals import *
 
 '''
-常量声明 
-'''
+常量声明 '''
 EMPTY_CELL = 0  # 空区标识，表示没有方块
 FALLING_BLOCK = 1  # 下落中的方块，也就是活动方块
 STATIC_BLOCK = 2  # 固始方块
@@ -103,7 +100,7 @@ def sys_init():
 
 def get_conf(file_name):
     '''
-    从文件‘elsfk.cfg’中读取方块的内容，配置的每一行代表一个方块，方块之间用‘;’隔开，用逗号分开矩阵列，
+    从文件‘game.cfg’中读取方块的内容，配置的每一行代表一个方块，方块之间用‘;’隔开，用逗号分开矩阵列，
     0表示有方块，1表示没有方块。
     然后将方块处理成为一个3维的list. list的第一个[]为方块的形状，用0,1,2,3,4,5,6代表。
     list的第二个[]代表方块旋转的方向，0代表顺时针旋转。
@@ -535,7 +532,7 @@ def main():
     '''
     主程序
     '''
-    get_conf("elsfk.cfg")
+    get_conf("game.cfg")
     sys_init()
     while True:
         process()
